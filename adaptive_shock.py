@@ -21,7 +21,7 @@ overshoot_data = []
 
 
 input_folder  = './input/'          # folder with parameters and input data
-output_folder = './evaluation/'        # folder to write results to
+output_folder = './results/'       # folder to write results to
 
 limit_abs_sim = 1000                # Event limits
 limit_rel_sim = 0.26

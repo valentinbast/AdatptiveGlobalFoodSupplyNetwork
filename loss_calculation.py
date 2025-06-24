@@ -8,8 +8,8 @@
 
 scenario = 'HOA'
 
-input_folder  = './input/'               # Folder with parameters
-output_folder = './results/'             # Folder to write results to
+input_folder  = './input/'   
+output_folder = './results/'             # Folder with parameters             # Folder to write results to
 losses        = './evaluation/'          # Folder to store the refined results to
 
 
