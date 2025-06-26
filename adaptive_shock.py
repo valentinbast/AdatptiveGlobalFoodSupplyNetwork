@@ -6,7 +6,7 @@
 
 ### IMPORTS ### PAK RUS HOA URU ALL
 
-from input.shock_input_data import *
+from shock_input_data import *
 import os
 
 ### PARAMETERS ###

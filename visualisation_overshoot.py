@@ -62,4 +62,4 @@ plt.legend(title='Scenario', loc='upper left', bbox_to_anchor=(1.05, 1))
 
 plt.tight_layout()
 plt.show()
-plt.savefig("evaluation/plots")
+plt.savefig("evaluation/plots/production_capacity_production.jpg")
