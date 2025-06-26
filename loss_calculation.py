@@ -11,8 +11,8 @@ from pathlib import Path
 
 
 ### PARAMETERS ###
-scenario = 'PAK'
-production_cap = True  # Add this parameter to control cap behavior
+scenario = 'URU'
+production_cap = False  # Add this parameter to control cap behavior
 
 #working directory
 script_dir = Path(__file__).parent.absolute()
@@ -74,20 +74,18 @@ def save_results(XS_comp, scenario, production_cap, losses_folder):
     print(f"Saved complete losses to: {complete_path}")
     
     # Save highest losses (>100 kg/capita)
-    XS_highest_losses = XS_comp[XS_comp['al/capita [kg]'] > 100]
+    XS_highest_losses = XS_comp[XS_comp['al/capita [kg]'] > 50]
     if not XS_highest_losses.empty:
         highest_losses_path = losses_folder / f"{scenario}-highestLosses{cap_suffix}.csv"
         XS_highest_losses.sort_values('al/capita [kg]', ascending=False).to_csv(highest_losses_path)
         print(f"Saved highest losses to: {highest_losses_path}")
     
     # Save highest profits (<-100 kg/capita)
-    XS_highest_profits = XS_comp[XS_comp['al/capita [kg]'] < -100]
+    XS_highest_profits = XS_comp[XS_comp['al/capita [kg]'] < -50]
     if not XS_highest_profits.empty:
         highest_profits_path = losses_folder / f"{scenario}-highestProfits{cap_suffix}.csv"
         XS_highest_profits.sort_values('al/capita [kg]', ascending=False).to_csv(highest_profits_path)
         print(f"Saved highest profits to: {highest_profits_path}")
-
-save_results(XS_comp, scenario, production_cap, losses_folder)
 
 save_results(XS_comp, scenario, production_cap, losses_folder)
 
