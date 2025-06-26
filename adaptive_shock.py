@@ -11,8 +11,8 @@ import os
 
 ### PARAMETERS ###
 
-scenario = 'ALL'                    # specify scenario
-production_cap = False               # turn on / off global production cap
+scenario = 'RUS'                    # specify scenario
+production_cap = True               # turn on / off global production cap
 compensation = True                 # turn adaptation on
 tau = 10                            # number of iterations
 overshoot_data = []
@@ -182,6 +182,9 @@ xs_timetrace = np.zeros((Na * Ni, tau), dtype=np.float32)  # optional: comment o
 rl_timetrace = np.zeros((Na * Ni, tau), dtype=np.float32)
 al_timetrace = np.zeros((Na * Ni, tau), dtype=np.float32)
 
+
+
+
 for t in range(tau):
 
     # Production
@@ -202,7 +205,7 @@ for t in range(tau):
     # Summation
     xs = o + h
 
-    ## Replace the production cap section with this:
+    
 
     if production_cap:
         initial_cap = 16e9  # Initial global production cap
@@ -223,6 +226,7 @@ for t in range(tau):
             print(f"Time {t}: Production capped at {productioncap:.2f} (Reduced by {current_prod-caped_prod:.2f})")
         else:
             scaling = 1.0
+            caped_prod = current_prod
     
         print(f"Scaling factor saved: {scaling:.4f}")
         
@@ -332,11 +336,15 @@ for t in range(tau):
     # Store
     XS.loc[idx[:, :], 'amount [t]'] = xs.toarray()[:, 0]
 
-# Save result matrix
-if compensation:
-    XS.to_csv(output_folder + scenario + '.csv')
-else:
-    XS.to_csv(output_folder + scenario + '_no_comp.csv')
+
+    # Save result matrix
+    if compensation:
+        XS.to_csv(output_folder + scenario + '.csv')
+    else:
+        XS.to_csv(output_folder + scenario + '_no_comp.csv')
+
+
+print(f'Shocked scenario done.')
 
 # Save overshoot data
 df_new = pd.DataFrame(overshoot_data)
@@ -356,6 +364,4 @@ else:
     df_combined = df_new
 
 df_combined.to_csv(outfile, index=False)
-
-print(f'Shocked scenario done.')
 
