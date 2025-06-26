@@ -11,8 +11,8 @@ import os
 
 ### PARAMETERS ###
 
-scenario = 'RUS'                    # specify scenario
-production_cap = True               # turn on / off global production cap
+scenario = 'ALL'                    # specify scenario
+production_cap = False               # turn on / off global production cap
 compensation = True                 # turn adaptation on
 tau = 10                            # number of iterations
 overshoot_data = []
@@ -22,6 +22,12 @@ overshoot_data = []
 
 input_folder  = './input/'          # folder with parameters and input data
 output_folder = './results/'       # folder to write results to
+overshoot_output_file = os.path.join(output_folder, 'production_overshoot.csv' if production_cap 
+else 'total_prod.csv')
+if os.path.exists(overshoot_output_file):
+    all_overshoot_data = pd.read_csv(overshoot_output_file)
+else:
+    all_overshoot_data = pd.DataFrame()
 
 limit_abs_sim = 1000                # Event limits
 limit_rel_sim = 0.26
@@ -337,31 +343,34 @@ for t in range(tau):
     XS.loc[idx[:, :], 'amount [t]'] = xs.toarray()[:, 0]
 
 
-    # Save result matrix
+    # Define the base filename based on compensation
     if compensation:
-        XS.to_csv(output_folder + scenario + '.csv')
+        base_filename = f"{scenario}.csv"
     else:
-        XS.to_csv(output_folder + scenario + '_no_comp.csv')
+        base_filename = f"{scenario}_no_comp.csv"
 
+    # Add production cap status to filename
+    if production_cap:
+        output_filename = base_filename.replace('.csv', '_capped.csv')
+    else:
+        output_filename = base_filename.replace('.csv', '_no_cap.csv')
+
+    # Save the results
+    XS.to_csv(os.path.join(output_folder, output_filename))
+
+    print(f'Shocked scenario saved to: {output_filename}')
 
 print(f'Shocked scenario done.')
 
-# Save overshoot data
-df_new = pd.DataFrame(overshoot_data)
+current_scenario_data = pd.DataFrame(overshoot_data)
 
-if production_cap:
-    outfile = 'production_overshoot.csv'
-else:
-    outfile = 'total_prod.csv'
+# Remove any existing data for this scenario to avoid duplicates
+if not all_overshoot_data.empty:
+    all_overshoot_data = all_overshoot_data[all_overshoot_data['scenario'] != scenario]
 
-if os.path.exists(outfile):
-    df_old = pd.read_csv(outfile)
-    # Drop previous rows with the same scenario name
-    df_old = df_old[df_old['scenario'] != scenario]
-    # Combine old (filtered) and new data
-    df_combined = pd.concat([df_old, df_new], ignore_index=True)
-else:
-    df_combined = df_new
+# Append new data
+all_overshoot_data = pd.concat([all_overshoot_data, current_scenario_data], ignore_index=True)
 
-df_combined.to_csv(outfile, index=False)
+# Save the complete dataset
+all_overshoot_data.to_csv(overshoot_output_file, index=False)
 

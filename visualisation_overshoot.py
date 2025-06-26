@@ -8,7 +8,7 @@ import plotly.express as px
 
 
 # Load and prepare data
-production_overshoot = pd.read_csv('production_overshoot.csv')
+production_overshoot = pd.read_csv('results/production_overshoot.csv')
 
 
 cap_line_df = production_overshoot[production_overshoot['scenario'] == production_overshoot['scenario'].unique()[0]][['time_step', 'cap']].copy()
@@ -62,3 +62,4 @@ plt.legend(title='Scenario', loc='upper left', bbox_to_anchor=(1.05, 1))
 
 plt.tight_layout()
 plt.show()
+plt.savefig("evaluation/plots")
