@@ -16,6 +16,6 @@ print("Files 1 2 are identical:", are_csvs_identical(file1, file2))
 
 
 # Example usage:
-file1 = "results/RUS_capped.csv"
+file1 = "results/PAK_capped.csv"
 file2 = "results/PAK_no_cap.csv"
 print("Files are identical:", are_csvs_identical(file1, file2))
