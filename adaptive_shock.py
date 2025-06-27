@@ -11,7 +11,7 @@ import os
 
 ### PARAMETERS ###
 
-scenario = 'PAK'                    # specify scenario
+scenario = 'ALL'                    # specify scenario
 production_cap = False               # turn on / off global production cap
 compensation = True                 # turn adaptation on
 tau = 10                            # number of iterations
@@ -206,20 +206,16 @@ for t in range(tau):
         sector = sector_ids.index(sector_id)
         o[sector_id] = shock_scaling[sector, t] * o[sector_id]
 
-
     if production_cap:
         initial_cap = 16e9
         productioncap = initial_cap * (1.011 ** t)
-        current_prod = o.sum()
-        caped_prod = current_prod  # Initialize here
-
-        print(f"Current production was at {current_prod:.2f}")
+        initial_production = o.sum()
+        print(f"Initial production was at {initial_production:.2f}")
         
-        if current_prod > productioncap:
-            scaling = productioncap / current_prod if current_prod > 0 else 0.0
+        if initial_production > productioncap:
+            scaling = productioncap / initial_production if initial_production > 0 else 0.0
             o = o.multiply(scaling)
-            current_prod = o.sum()
-            caped_prod = current_prod
+            capped_prod = o.sum()
             print(f"Time {t}: Production capped at {productioncap:.2f}")
         else:
             scaling = 1.0
@@ -229,11 +225,12 @@ for t in range(tau):
         overshoot_data.append({
             'scenario': scenario,
             'time_step': t,
-            'total_prod': float(current_prod),
+            'initial production': float(initial_production),
             'cap': float(productioncap),
-            'caped_prod' : float(caped_prod),
+            'capped production' : float(capped_prod),
             'scaling': float(scaling)
             })
+
     else:
         # Track production without cap for this time step
         overshoot_data.append({
@@ -243,12 +240,14 @@ for t in range(tau):
             'cap': float('inf'),
             'scaling': 1.0
         })
-    
+    print("eta_exp_shock min/max:", eta_exp_shock.min(), eta_exp_shock.max())
+    print("xs min/max:", xs.min(), xs.max())
+    print("eta_exp_shock * xs min/max:", eta_exp_shock.multiply(xs).min(), eta_exp_shock.multiply(xs).max())
     h = T_shock @ (eta_exp_shock.multiply(xs))
-
-    
-    xs = o + h  
-
+    print(f"Time {t}:Production (o): {o.sum():.2f}, Trade volume (h): {h.sum():.2f}")
+    xs = o + h
+    print(f"Time {t}: Total production (xs): {xs.sum():.2f}")
+    xs_timetrace[:, t] = xs.toarray()[:, 0]
 
     # Relative loss
     rl = sprs.csr_matrix(np.nan_to_num(1 - xs / sprs.csr_matrix(x_timetrace_base[:, t]).T, nan=0))
@@ -301,19 +300,60 @@ for t in range(tau):
         eta_cons_shock[mask, :] = (eta_cons[mask, :].multiply(transition_eta_cons_multi[mask, :]) +
                                    transition_eta_cons_rewire[mask, :]).multiply(rl[mask])
 
+        # Compute faktor
         faktor = eta_exp_shock[mask, :] + eta_prod_shock[mask, :] + eta_cons_shock[mask, :]
-        eta_exp_shock[mask, :] = eta_exp_shock[mask, :] / faktor
-        eta_prod_shock[mask, :] = eta_prod_shock[mask, :] / faktor
-        eta_cons_shock[mask, :] = eta_cons_shock[mask, :] / faktor
 
-        T_shock[mask, :] = (T[mask, :].multiply(transition_import_multi[mask, :]) +
-                            transition_import_rewire[mask, :]).multiply(rl[mask])
-        T_shock[:, mask] = (T[:, mask].multiply(transition_export_multi[:, mask]) +
-                            transition_export_rewire[:, mask]).multiply(rl[mask].T)
+        # Get nonzero indices for each matrix
+        exp_nonzero = eta_exp_shock[mask, :].nonzero()[1]
+        prod_nonzero = eta_prod_shock[mask, :].nonzero()[1]
+        cons_nonzero = eta_cons_shock[mask, :].nonzero()[1]
 
-        mask_5 = (T_shock.sum(axis=0).A1 > 0) & (
-            (T_shock.sum(axis=0).A1 < 0.99) | (T_shock.sum(axis=0).A1 > 1.01)
-        )
+        # Find the safe range we can operate on
+        min_length = min(len(exp_nonzero), len(prod_nonzero), len(cons_nonzero), len(faktor.data))
+        common_indices = np.arange(min_length)
+        valid_mask = (faktor.data[common_indices] > 0) & (~np.isnan(faktor.data[common_indices]))
+
+        # Apply normalization safely
+        for i in common_indices[valid_mask]:
+            if i < len(exp_nonzero):
+                eta_exp_shock.data[exp_nonzero[i]] /= faktor.data[i]
+            if i < len(prod_nonzero):
+                eta_prod_shock.data[prod_nonzero[i]] /= faktor.data[i]
+            if i < len(cons_nonzero):
+                eta_cons_shock.data[cons_nonzero[i]] /= faktor.data[i]
+
+        # Alternative even safer approach (slower but guaranteed to work)
+        for i in range(len(faktor.data)):
+            if i >= min_length:
+                break
+            if faktor.data[i] > 0 and not np.isnan(faktor.data[i]):
+                try:
+                    if i < len(exp_nonzero):
+                        eta_exp_shock.data[exp_nonzero[i]] /= faktor.data[i]
+                    if i < len(prod_nonzero):
+                        eta_prod_shock.data[prod_nonzero[i]] /= faktor.data[i]
+                    if i < len(cons_nonzero):
+                        eta_cons_shock.data[cons_nonzero[i]] /= faktor.data[i]
+                except IndexError:
+                    continue
+
+        # Clean up and verify
+        eta_exp_shock.eliminate_zeros()
+        eta_prod_shock.eliminate_zeros()
+        eta_cons_shock.eliminate_zeros()
+
+        eta_exp_shock.data = np.nan_to_num(eta_exp_shock.data, nan=0.0)
+        eta_prod_shock.data = np.nan_to_num(eta_prod_shock.data, nan=0.0)
+        eta_cons_shock.data = np.nan_to_num(eta_cons_shock.data, nan=0.0)
+
+        # Final verification
+        assert not np.isnan(eta_exp_shock.data).any()
+        assert not np.isnan(eta_prod_shock.data).any()
+        assert not np.isnan(eta_cons_shock.data).any()
+
+        T_shock[mask, :] = (T[mask, :].multiply(transition_import_multi[mask, :]) + transition_import_rewire[mask, :]).multiply(rl[mask])
+        T_shock[:, mask] = (T[:, mask].multiply(transition_export_multi[:, mask]) + transition_export_rewire[:, mask]).multiply(rl[mask].T)
+        mask_5 = (T_shock.sum(axis=0).A1 > 0) & ((T_shock.sum(axis=0).A1 < 0.99) | (T_shock.sum(axis=0).A1 > 1.01))
         T_shock[:, mask_5] = T_shock[:, mask_5] / T_shock.sum(axis=0).A1[mask_5]
 
     if t == 2 and compensation:
@@ -331,7 +371,11 @@ for t in range(tau):
         mask_subs_3 = (T_shock.sum(axis=0).A1 > 0) & (
             (T_shock.sum(axis=0).A1 < 0.99) | (T_shock.sum(axis=0).A1 > 1.01)
         )
+        
         T_shock[:, mask_subs_3] = T_shock[:, mask_subs_3] / T_shock.sum(axis=0).A1[mask_subs_3]
+
+
+
 
     # Store
     XS.loc[idx[:, :], 'amount [t]'] = xs.toarray()[:, 0]  # Update final values

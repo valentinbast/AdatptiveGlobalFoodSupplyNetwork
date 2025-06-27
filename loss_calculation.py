@@ -13,7 +13,7 @@ from pathlib import Path
 ### PARAMETERS ###
 ###SCENSRIOS : PAK RUS HOA URU ALL
 scenario = 'ALL'
-production_cap = False  # Add this parameter to control cap behavior
+production_cap = True  # Add this parameter to control cap behavior
 
 #working directory
 script_dir = Path(__file__).parent.absolute()
