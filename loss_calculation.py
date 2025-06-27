@@ -11,8 +11,9 @@ from pathlib import Path
 
 
 ### PARAMETERS ###
-scenario = 'URU'
-production_cap = False  # Add this parameter to control cap behavior
+###SCENSRIOS : PAK RUS HOA URU ALL
+scenario = 'PAK'
+production_cap = True  # Add this parameter to control cap behavior
 
 #working directory
 script_dir = Path(__file__).parent.absolute()
@@ -28,7 +29,7 @@ losses_folder = script_dir /  'evaluation'
 def load_data(scenario, production_cap):
     """Load data with appropriate filename based on production_cap"""
     base_file = output_folder / f"{scenario}_base_.csv"
-    scenario_file = output_folder / f"{scenario}{'' if production_cap else '_no_cap'}.csv"
+    scenario_file = output_folder / f"{scenario}{'_capped' if production_cap else '_no_cap'}.csv"
     
     X_base = pd.read_csv(base_file, index_col=[0, 1], header=[0])
     XS_comp = pd.read_csv(scenario_file, index_col=[0, 1], header=[0])

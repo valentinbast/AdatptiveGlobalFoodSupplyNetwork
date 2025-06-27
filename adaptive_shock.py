@@ -11,7 +11,7 @@ import os
 
 ### PARAMETERS ###
 
-scenario = 'ALL'                    # specify scenario
+scenario = 'PAK'                    # specify scenario
 production_cap = False               # turn on / off global production cap
 compensation = True                 # turn adaptation on
 tau = 10                            # number of iterations
@@ -24,6 +24,7 @@ input_folder  = './input/'          # folder with parameters and input data
 output_folder = './results/'       # folder to write results to
 overshoot_output_file = os.path.join(output_folder, 'production_overshoot.csv' if production_cap 
 else 'total_prod.csv')
+
 if os.path.exists(overshoot_output_file):
     all_overshoot_data = pd.read_csv(overshoot_output_file)
 else:
@@ -205,37 +206,26 @@ for t in range(tau):
         sector = sector_ids.index(sector_id)
         o[sector_id] = shock_scaling[sector, t] * o[sector_id]
 
-    # Trade
-    h = T_shock @ (eta_exp_shock.multiply(xs))
-
-    # Summation
-    xs = o + h
-
-    
 
     if production_cap:
-        initial_cap = 16e9  # Initial global production cap
-        productioncap = initial_cap * (1.011 ** t)  # Growing cap over time
-    
-        # Calculate current total production (sum of all sectors)
+        initial_cap = 16e9
+        productioncap = initial_cap * (1.011 ** t)
         current_prod = o.sum()
+        caped_prod = current_prod  # Initialize here
+
         print(f"Current production was at {current_prod:.2f}")
         
         if current_prod > productioncap:
-            # Calculate scaling factor to bring production down to cap
-            scaling = productioncap / current_prod
-            # Apply scaling to all sectors
+            scaling = productioncap / current_prod if current_prod > 0 else 0.0
             o = o.multiply(scaling)
-            # Store the actual production after scaling
-            caped_prod = o.sum()
-            
-            print(f"Time {t}: Production capped at {productioncap:.2f} (Reduced by {current_prod-caped_prod:.2f})")
+            current_prod = o.sum()
+            caped_prod = current_prod
+            print(f"Time {t}: Production capped at {productioncap:.2f}")
         else:
             scaling = 1.0
-            caped_prod = current_prod
-    
-        print(f"Scaling factor saved: {scaling:.4f}")
-        
+            print(f"No capping needed (scaling: {scaling:.4f})")
+            
+
         overshoot_data.append({
             'scenario': scenario,
             'time_step': t,
@@ -253,8 +243,12 @@ for t in range(tau):
             'cap': float('inf'),
             'scaling': 1.0
         })
+    
+    h = T_shock @ (eta_exp_shock.multiply(xs))
 
-    xs_timetrace[:, t] = xs.toarray()[:, 0]
+    
+    xs = o + h  
+
 
     # Relative loss
     rl = sprs.csr_matrix(np.nan_to_num(1 - xs / sprs.csr_matrix(x_timetrace_base[:, t]).T, nan=0))
@@ -340,27 +334,34 @@ for t in range(tau):
         T_shock[:, mask_subs_3] = T_shock[:, mask_subs_3] / T_shock.sum(axis=0).A1[mask_subs_3]
 
     # Store
-    XS.loc[idx[:, :], 'amount [t]'] = xs.toarray()[:, 0]
+    XS.loc[idx[:, :], 'amount [t]'] = xs.toarray()[:, 0]  # Update final values
 
 
-    # Define the base filename based on compensation
-    if compensation:
-        base_filename = f"{scenario}.csv"
-    else:
-        base_filename = f"{scenario}_no_comp.csv"
 
-    # Add production cap status to filename
-    if production_cap:
-        output_filename = base_filename.replace('.csv', '_capped.csv')
-    else:
-        output_filename = base_filename.replace('.csv', '_no_cap.csv')
+# Define the base filename based on compensation
+if compensation:
+    base_filename = f"{scenario}.csv"
+else:
+    base_filename = f"{scenario}_no_comp.csv"
 
-    # Save the results
-    XS.to_csv(os.path.join(output_folder, output_filename))
+# Add production cap status to filename
+if production_cap:
+    output_filename = base_filename.replace('.csv', '_capped.csv')
+else:
+    output_filename = base_filename.replace('.csv', '_no_cap.csv')
 
-    print(f'Shocked scenario saved to: {output_filename}')
+# Save the results
+XS.to_csv(os.path.join(output_folder, output_filename))
+
+print(f'Shocked scenario saved to: {output_filename}')
+
+print("Uncapped production (o):", o.sum())
+print("Total supply (xs):", xs.sum())
 
 print(f'Shocked scenario done.')
+
+
+
 
 current_scenario_data = pd.DataFrame(overshoot_data)
 
