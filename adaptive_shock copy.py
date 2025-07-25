@@ -4,15 +4,18 @@
 #  ADAPTED BY CSM_SEXY_GRP_ - 2025, ORIGIN: SOPHIA BAUM - 2024
 
 
-### IMPORTS ### PAK RUS HOA URU ALL
+### IMPORTS ###
+#SCEANRIOS:  PAK RUS HOA URU ALL
 
 from shock_input_data import *
 import os
 
 ### PARAMETERS ###
 
-scenario = 'ALL'                    # specify scenario
-production_cap = True               # turn on / off global production cap
+scenario = 'ALL'
+input_limit = True
+ressource_limit = False                    # specify scenario
+production_cap = False               # turn on / off global production cap
 compensation = True                 # turn adaptation on
 tau = 10                            # number of iterations
 overshoot_data = []
@@ -21,17 +24,13 @@ overshoot_data = []
 input_folder  = './input/'          # folder with parameters and input data
 output_folder = './results/'       # folder to write results to
 
-overshoot_output_file = os.path.join(output_folder, 'production_overshoot.csv' if production_cap 
-else 'total_prod.csv')
-if os.path.exists(overshoot_output_file):
-    all_overshoot_data = pd.read_csv(overshoot_output_file)
-else:
-    all_overshoot_data = pd.DataFrame()
+
+
 
 limit_abs_sim = 1000                # Event limits
 limit_rel_sim = 0.26
 limit_dev_sim = 0.32
-
+total_resources = 1e12 
 
 ### LOADING DATA ###
 
@@ -240,7 +239,51 @@ for t in range(tau):
     h = T_shock @ (eta_exp_shock.multiply(xs))
     print(f"Time {t}:Production (o): {o.sum():.2f}, Trade volume (h): {h.sum():.2f}")
     xs = o + h
-    print(f"Time {t}: Total production (xs): {xs.sum():.2f}")
+    
+    # apply resource limit
+    if ressource_limit:
+        # Introduce global ressource limit
+        current_sum = xs.sum()
+        if current_sum > total_resources:
+            scaling_factor = total_resources / current_sum
+            xs = xs.multiply(scaling_factor)
+            print(f"Time {t}: Resource limit applied. Scaling factor: {total_resources / current_sum:.4f}")
+            overshoot_data.append({
+            'time_step': t,
+            'type': 'resource_limit',
+            'scaling_factor': float(scaling_factor),
+            'current_sum': float(current_sum),
+            'limit': float(total_resources)})
+        else:
+            xs = xs
+    else:
+        xs=xs
+
+
+    # apply input limit
+    if input_limit:
+        # Scale outputs by available inputs:
+        input_energy = (beta @ one_vec_proc).sum()
+        output_energy = xs.sum()
+        if output_energy > input_energy * 1.05:  # Allow 5% efficiency gain
+            scaling_factor = (input_energy * 1.05) / output_energy
+            xs = xs.multiply(scaling_factor)
+            print(f"Time {t}: Input limit applied. Scaling factor: {input_energy / output_energy:.4f}")
+            
+            overshoot_data.append({
+                'time_step': t,
+                'type': 'input_limit',
+                'scaling_factor': float(scaling_factor),  # Changed from scaling_energy
+                'output_energy': float(output_energy),
+                'input_energy': float(input_energy)
+            })
+
+        else:
+            xs = xs
+
+    else:
+        xs = xs
+
     xs_timetrace[:, t] = xs.toarray()[:, 0]
 
     # Relative loss
@@ -379,6 +422,7 @@ for t in range(tau):
     # Store
     XS.loc[idx[:, :], 'amount [t]'] = xs.toarray()[:, 0]  # Update final values
 
+print(f'Shocked scenario done.')
 
 
 # Define the base filename based on compensation
@@ -398,11 +442,6 @@ XS.to_csv(os.path.join(output_folder, output_filename))
 
 print(f'Shocked scenario saved to: {output_filename}')
 
-print("Uncapped production (o):", o.sum())
-print("Total supply (xs):", xs.sum())
-
-print(f'Shocked scenario done.')
-
 current_scenario_data = pd.DataFrame(overshoot_data)
 
 # Remove any existing data for this scenario to avoid duplicates
@@ -412,6 +451,13 @@ if not all_overshoot_data.empty:
 # Append new data
 all_overshoot_data = pd.concat([all_overshoot_data, current_scenario_data], ignore_index=True)
 
-# Save the complete dataset
-all_overshoot_data.to_csv(overshoot_output_file, index=False)
+# Determine output file based on production_cap
+if production_cap:
+    output_file = os.path.join(output_folder, 'production_cap_log.csv')
+else:
+    output_file = os.path.join(output_folder, 'production_log.csv')
 
+# Save to appropriate file
+all_overshoot_data.to_csv(output_file, index=False)
+
+print(f"Overshoot data saved to: {output_file}")
