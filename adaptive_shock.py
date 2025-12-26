@@ -297,17 +297,17 @@ for t in range(tau):
         # Compute faktor
         faktor = eta_exp_shock[mask, :] + eta_prod_shock[mask, :] + eta_cons_shock[mask, :]
 
-        # Get nonzero indices for each matrix
+        
         exp_nonzero = eta_exp_shock[mask, :].nonzero()[1]
         prod_nonzero = eta_prod_shock[mask, :].nonzero()[1]
         cons_nonzero = eta_cons_shock[mask, :].nonzero()[1]
 
-        # Find the safe range we can operate on
+        
         min_length = min(len(exp_nonzero), len(prod_nonzero), len(cons_nonzero), len(faktor.data))
         common_indices = np.arange(min_length)
         valid_mask = (faktor.data[common_indices] > 0) & (~np.isnan(faktor.data[common_indices]))
 
-        # Apply normalization safely
+        
         for i in common_indices[valid_mask]:
             if i < len(exp_nonzero):
                 eta_exp_shock.data[exp_nonzero[i]] /= faktor.data[i]
@@ -316,7 +316,7 @@ for t in range(tau):
             if i < len(cons_nonzero):
                 eta_cons_shock.data[cons_nonzero[i]] /= faktor.data[i]
 
-        # Alternative even safer approach (slower but guaranteed to work)
+        
         for i in range(len(faktor.data)):
             if i >= min_length:
                 break
@@ -331,7 +331,7 @@ for t in range(tau):
                 except IndexError:
                     continue
 
-        # Clean up and verify
+        
         eta_exp_shock.eliminate_zeros()
         eta_prod_shock.eliminate_zeros()
         eta_cons_shock.eliminate_zeros()
@@ -354,26 +354,25 @@ for t in range(tau):
 
         mask_subs_2 = substitutability_trade[mask_subs].nonzero()[1]
 
-        # Apply capped substitutability
+        
         substitutability_factor = np.minimum(substitutability_trade[mask_subs].data + 1, 2.0)
         T_shock[mask_subs_2, :] = T_shock[mask_subs_2, :].multiply(
             sprs.csr_matrix(substitutability_factor).T)
 
-        # Robust normalization in 3 steps:
-        # 1. Get column sums
+        
         col_sums = T_shock.sum(axis=0).A1
         
-        # 2. Handle zero columns by creating self-loops
+        
         zero_cols = col_sums == 0
         if np.any(zero_cols):
             rows = np.where(zero_cols)[0]
             T_shock[rows, rows] = 1.0  # Add 1.0 to diagonal
             col_sums[zero_cols] = 1.0  # Update sums
         
-        # 3. Normalize all columns
+        
         T_shock = T_shock.multiply(1 / col_sums)
 
-        # Quick verification
+        
         final_sums = T_shock.sum(axis=0).A1
         print(f"Normalization check - Min: {final_sums.min():.6f}, Max: {final_sums.max():.6f}")
     # Store
@@ -381,13 +380,13 @@ for t in range(tau):
 
 
 
-# Define the base filename based on compensation
+
 if compensation:
     base_filename = f"{scenario}.csv"
 else:
     base_filename = f"{scenario}_no_comp.csv"
 
-# Add production cap status to filename
+
 if production_cap:
     output_filename = base_filename.replace('.csv', '_capped.csv')
 else:
