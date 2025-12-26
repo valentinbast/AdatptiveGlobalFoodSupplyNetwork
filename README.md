@@ -11,3 +11,4 @@ All necessary input for both codes, can be found in the folder /input.
 
 In the folder /substitution, you find a summary of all substitution indexes as a table and visualized matrices for all subgroups, derived according to 4.4.5 Item substitutability.
 
+The modification by Bast, Mair et al. mainly concerns with the introduction of a realisitc climate shock into the network. The report describes the modifications and results.  
